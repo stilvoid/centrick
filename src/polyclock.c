@@ -69,7 +69,12 @@ static void display_layer_update(Layer *layer, GContext *ctx) {
 
     // Draw the poly
     path = gpath_create(&path_info);
-    gpath_draw_filled(ctx, path);
+    if(tick_time->tm_sec == tick_time->tm_min || tick_time->tm_sec == tick_time->tm_hour * 5) {
+        // Make it easier to see
+        gpath_draw_outline(ctx, path);
+    } else {
+        gpath_draw_filled(ctx, path);
+    }
     gpath_destroy(path);
 
     // Draw some dots
