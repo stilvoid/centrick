@@ -1,0 +1,22 @@
+{
+    "uuid": "fca7925d-b710-4803-aac0-1f050a4ec6ed",
+    "shortName": "PolyClock",
+    "longName": "A simple watchface that draws a changing polygon",
+    "companyName": "Stilvoid",
+    "versionCode": 1,
+    "versionLabel": "0.1",
+    "watchapp": {
+        "watchface": true
+    },
+    "appKeys": {},
+    "resources": {
+        "media": [
+            {
+                "file": "images/menu-icon.png",
+                "menuIcon": true,
+                "name": "IMAGE_MENU_ICON",
+                "type": "png"
+            }
+        ]
+    }
+}
