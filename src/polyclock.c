@@ -54,12 +54,12 @@ static void display_layer_update(Layer *layer, GContext *ctx) {
     path_info.points[0].y = centre.y - (cos_lookup(angle) * radius / TRIG_MAX_RATIO);
     
     // Minute
-    angle = TRIG_MAX_ANGLE * (tick_time->tm_min / 60.0);
+    angle = TRIG_MAX_ANGLE * (((tick_time->tm_min * 60) + tick_time->tm_sec) / 3600.0);
     path_info.points[1].x = centre.x + (sin_lookup(angle) * radius / TRIG_MAX_RATIO);
     path_info.points[1].y = centre.y - (cos_lookup(angle) * radius / TRIG_MAX_RATIO);
 
     // Hour
-    angle = TRIG_MAX_ANGLE * ((tick_time->tm_hour % 12) / 12.0);
+    angle = TRIG_MAX_ANGLE * ((((tick_time->tm_hour % 12) * 60) + tick_time->tm_min)  / 720.0);
     path_info.points[2].x = centre.x + (sin_lookup(angle) * radius / TRIG_MAX_RATIO);
     path_info.points[2].y = centre.y - (cos_lookup(angle) * radius / TRIG_MAX_RATIO);
 
