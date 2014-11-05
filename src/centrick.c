@@ -6,81 +6,141 @@ static Window *window;
 static Layer *background_layer;
 static Layer *display_layer;
 
-static GPath *path = NULL;
+#define WIDTH 144
+#define HEIGHT 168
+#define CENTRE { WIDTH / 2, HEIGHT / 2 }
+#define TOP_CENTRE { WIDTH / 2, 0 }
+#define TOP_LEFT {0, 0}
+#define BOTTOM_LEFT {0, HEIGHT}
+#define BOTTOM_RIGHT { WIDTH, HEIGHT }
+#define TOP_RIGHT { WIDTH, 0}
 
+#define RING_WIDTH 10
+#define GAP 5
+#define MAX_RADIUS (WIDTH / 2) - GAP
+
+# define M_PI		3.14159265358979323846	/* pi */
+
+static GPoint centre = CENTRE;
+static GPath *path = NULL;
 static GPathInfo path_info = {
-    .num_points = 3,
+    .num_points = 7,
     .points = (GPoint[]) {
-        {72, 84},
-        {72, 84},
-        {72, 84}
+        CENTRE,
+        TOP_CENTRE,
+        TOP_LEFT,
+        BOTTOM_LEFT,
+        BOTTOM_RIGHT,
+        TOP_RIGHT,
+        {0, 0}
     }
 };
 
-static GPoint centre = {144 / 2, 168 / 2};
-static const int radius = 144 / 2 - 20;
-static const int mark_radius = 144 / 2 - 10;
-static const int mark_size = 10;
+static GBitmap *second_bitmap;
+static GBitmap *minute_bitmap;
+static GBitmap *hour_bitmap;
 
-static double angle;
+static void draw_ring(Layer *layer, GContext *ctx, double angle, int radius) {
+    GPoint end;
 
-static void background_layer_update(Layer *layer, GContext *ctx) {
-    GPoint tick_in;
-    GPoint tick_out;
+    // Draw big circle
+    graphics_context_set_fill_color(ctx, GColorBlack);
+    graphics_fill_circle(ctx, centre, radius);
 
-    graphics_context_set_stroke_color(ctx, GColorBlack);
-
-    // Draw some marks
-    for(int i=0; i<12; i++) {
-        angle = TRIG_MAX_ANGLE * (i / 12.0);
-
-        tick_in.x = centre.x + (sin_lookup(angle) * (mark_radius) / TRIG_MAX_RATIO);
-        tick_in.y = centre.y - (cos_lookup(angle) * (mark_radius) / TRIG_MAX_RATIO);
-
-        tick_out.x = centre.x + (sin_lookup(angle) * (mark_radius - mark_size) / TRIG_MAX_RATIO);
-        tick_out.y = centre.y - (cos_lookup(angle) * (mark_radius - mark_size) / TRIG_MAX_RATIO);
-    
-        graphics_draw_line(ctx, tick_in, tick_out);
+    graphics_context_set_fill_color(ctx, GColorClear);
+    if(angle <= TRIG_MAX_ANGLE / 4) {
+        path_info.points[4] = (GPoint) BOTTOM_RIGHT;
+        path_info.points[5] = (GPoint) TOP_RIGHT;
+    } else if(angle <= TRIG_MAX_ANGLE / 2) {
+        path_info.points[4] = (GPoint) BOTTOM_RIGHT;
+        path_info.points[5] = (GPoint) BOTTOM_RIGHT;
+    } else if(angle <= TRIG_MAX_ANGLE * 0.75) {
+        path_info.points[4] = (GPoint) BOTTOM_LEFT;
+        path_info.points[5] = (GPoint) BOTTOM_LEFT;
+    } else {
+        path_info.points[4] = (GPoint) TOP_LEFT;
+        path_info.points[5] = (GPoint) TOP_LEFT;
     }
+
+    path_info.points[6].x = centre.x + (sin_lookup(angle) * WIDTH / TRIG_MAX_RATIO);
+    path_info.points[6].y = centre.y - (cos_lookup(angle) * WIDTH / TRIG_MAX_RATIO);
+
+    path = gpath_create(&path_info);
+    gpath_draw_filled(ctx, path);
+    gpath_destroy(path);
+    
+    // Draw small circle
+    graphics_context_set_fill_color(ctx, GColorClear);
+    graphics_fill_circle(ctx, centre, radius - RING_WIDTH);
 }
 
-static void display_layer_update(Layer *layer, GContext *ctx) {
+static void snapshot(Layer *layer, GContext *ctx, GBitmap *target) {
+    GBitmap *display_bitmap = graphics_capture_frame_buffer(ctx);
+    memcpy(target->addr, display_bitmap->addr, display_bitmap->row_size_bytes * display_bitmap->bounds.size.h);
+    graphics_release_frame_buffer(ctx, display_bitmap);
+}
+
+static void get_second_bitmap(Layer *layer, GContext *ctx) {
     time_t temp = time(NULL);
     struct tm *tick_time = localtime(&temp);
+    double angle;
+
+    graphics_context_set_fill_color(ctx, GColorClear);
+    graphics_fill_rect(ctx, GRect(0, 0, WIDTH, HEIGHT), 0, GCornerNone);
 
     // Second
     angle = TRIG_MAX_ANGLE * (tick_time->tm_sec / 60.0);
-    path_info.points[0].x = centre.x + (sin_lookup(angle) * radius / TRIG_MAX_RATIO);
-    path_info.points[0].y = centre.y - (cos_lookup(angle) * radius / TRIG_MAX_RATIO);
-    
+    draw_ring(layer, ctx, angle, MAX_RADIUS);
+
+    snapshot(layer, ctx, second_bitmap);
+}
+
+static void get_minute_bitmap(Layer *layer, GContext *ctx) {
+    time_t temp = time(NULL);
+    struct tm *tick_time = localtime(&temp);
+    double angle;
+
+    graphics_context_set_fill_color(ctx, GColorClear);
+    graphics_fill_rect(ctx, GRect(0, 0, WIDTH, HEIGHT), 0, GCornerNone);
+
     // Minute
     angle = TRIG_MAX_ANGLE * (((tick_time->tm_min * 60) + tick_time->tm_sec) / 3600.0);
-    path_info.points[1].x = centre.x + (sin_lookup(angle) * radius / TRIG_MAX_RATIO);
-    path_info.points[1].y = centre.y - (cos_lookup(angle) * radius / TRIG_MAX_RATIO);
+    draw_ring(layer, ctx, angle, MAX_RADIUS - RING_WIDTH - GAP);
+
+    snapshot(layer, ctx, minute_bitmap);
+}
+
+static void get_hour_bitmap(Layer *layer, GContext *ctx) {
+    time_t temp = time(NULL);
+    struct tm *tick_time = localtime(&temp);
+    double angle;
+
+    graphics_context_set_fill_color(ctx, GColorClear);
+    graphics_fill_rect(ctx, GRect(0, 0, WIDTH, HEIGHT), 0, GCornerNone);
 
     // Hour
     angle = TRIG_MAX_ANGLE * ((((tick_time->tm_hour % 12) * 60) + tick_time->tm_min)  / 720.0);
-    path_info.points[2].x = centre.x + (sin_lookup(angle) * radius / TRIG_MAX_RATIO);
-    path_info.points[2].y = centre.y - (cos_lookup(angle) * radius / TRIG_MAX_RATIO);
+    draw_ring(layer, ctx, angle, MAX_RADIUS - RING_WIDTH * 2 - GAP * 2);
 
-    // Do some drawing
-    graphics_context_set_stroke_color(ctx, GColorBlack);
-    graphics_context_set_fill_color(ctx, GColorBlack);
+    snapshot(layer, ctx, hour_bitmap);
+}
 
-    // Draw the poly
-    path = gpath_create(&path_info);
-    if(tick_time->tm_sec == tick_time->tm_min || tick_time->tm_sec == tick_time->tm_hour * 5) {
-        // Make it easier to see
-        gpath_draw_outline(ctx, path);
-    } else {
-        gpath_draw_filled(ctx, path);
-    }
-    gpath_destroy(path);
+static void display_layer_update(Layer *layer, GContext *ctx) {
+    get_second_bitmap(layer, ctx);
+    get_minute_bitmap(layer, ctx);
+    get_hour_bitmap(layer, ctx);
 
-    // Draw some dots
-    graphics_fill_circle(ctx, path_info.points[0], 1);
-    graphics_fill_circle(ctx, path_info.points[1], 2);
-    graphics_fill_circle(ctx, path_info.points[2], 3);
+    // Clear
+    graphics_context_set_fill_color(ctx, GColorClear);
+    graphics_fill_rect(ctx, GRect(0, 0, WIDTH, HEIGHT), 0, GCornerNone);
+
+    // Set compositing mode
+    graphics_context_set_compositing_mode(ctx, GCompOpAnd);
+
+    // Draw the bitmaps
+    graphics_draw_bitmap_in_rect(ctx, second_bitmap, GRect(0, 0, WIDTH, HEIGHT));
+    graphics_draw_bitmap_in_rect(ctx, minute_bitmap, GRect(0, 0, WIDTH, HEIGHT));
+    graphics_draw_bitmap_in_rect(ctx, hour_bitmap, GRect(0, 0, WIDTH, HEIGHT));
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changes) {
@@ -94,7 +154,7 @@ static void init(void) {
     window_stack_push(window, animated);
 
     // Set a black background
-    window_set_background_color(window, GColorWhite);
+    window_set_background_color(window, GColorClear);
 
     // Register tick timer service
     tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
@@ -105,18 +165,28 @@ static void init(void) {
     
     // Create a layer for the marks
     background_layer = layer_create(frame);
-    layer_set_update_proc(background_layer, &background_layer_update);
+    //layer_set_update_proc(background_layer, &background_layer_update);
     layer_add_child(root_layer, background_layer);
 
-    // Create a layer for the poly
+    // Create a layer for the display
     display_layer = layer_create(frame);
     layer_set_update_proc(display_layer, &display_layer_update);
     layer_add_child(background_layer, display_layer);
+
+    // Set up the bitmaps
+    second_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
+    minute_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
+    hour_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
 }
 
 static void deinit(void) {
+    gbitmap_destroy(second_bitmap);
+    gbitmap_destroy(minute_bitmap);
+    gbitmap_destroy(hour_bitmap);
+
     layer_destroy(display_layer);
     layer_destroy(background_layer);
+
     window_destroy(window);
 }
 
