@@ -1,10 +1,10 @@
 {
-    "uuid": "fca7925d-b710-4803-aac0-1f050a4ec6ed",
-    "shortName": "PolyClock",
-    "longName": "A simple watchface that draws a changing polygon",
+    "uuid": "f623c31a-4eaa-4b29-99c6-c4b7095687c5",
+    "shortName": "centrick",
+    "longName": "A pebble watchface that shows the time using concentric arcs",
     "companyName": "Stilvoid",
     "versionCode": 1,
-    "versionLabel": "0.3",
+    "versionLabel": "0.1",
     "watchapp": {
         "watchface": true
     },

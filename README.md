@@ -1,3 +1,3 @@
-# PolyClock
+# Centrick
 
-PolyClock is a simple watchface for [Pebble](http://getpebble.com) that draws out a polygon based on the positions of the hands of the clock.
+A [Pebble](http://getpebble.com) watchface that shows the time using concentric arcs
