@@ -104,7 +104,7 @@ static void get_minute_bitmap(Layer *layer, GContext *ctx) {
     graphics_fill_rect(ctx, GRect(0, 0, WIDTH, HEIGHT), 0, GCornerNone);
 
     // Minute
-    angle = TRIG_MAX_ANGLE * (((tick_time->tm_min * 60) + tick_time->tm_sec) / 3600.0);
+    angle = TRIG_MAX_ANGLE * (tick_time->tm_min / 60.0);
     draw_ring(layer, ctx, angle, MAX_RADIUS - RING_WIDTH - GAP);
 
     snapshot(layer, ctx, minute_bitmap);
@@ -119,7 +119,7 @@ static void get_hour_bitmap(Layer *layer, GContext *ctx) {
     graphics_fill_rect(ctx, GRect(0, 0, WIDTH, HEIGHT), 0, GCornerNone);
 
     // Hour
-    angle = TRIG_MAX_ANGLE * ((((tick_time->tm_hour % 12) * 60) + tick_time->tm_min)  / 720.0);
+    angle = TRIG_MAX_ANGLE * ((tick_time->tm_hour % 12) / 12.0);
     draw_ring(layer, ctx, angle, MAX_RADIUS - RING_WIDTH * 2 - GAP * 2);
 
     snapshot(layer, ctx, hour_bitmap);
