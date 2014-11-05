@@ -47,6 +47,10 @@ static void draw_ring(Layer *layer, GContext *ctx, double angle, int radius) {
     graphics_context_set_fill_color(ctx, GColorBlack);
     graphics_fill_circle(ctx, centre, radius);
 
+    if(angle == 0) {
+        angle = TRIG_MAX_ANGLE;
+    }
+
     graphics_context_set_fill_color(ctx, GColorClear);
     if(angle <= TRIG_MAX_ANGLE / 4) {
         path_info.points[4] = (GPoint) BOTTOM_RIGHT;
