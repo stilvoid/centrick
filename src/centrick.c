@@ -43,6 +43,10 @@ static GBitmap *hour_bitmap;
 static void draw_ring(Layer *layer, GContext *ctx, double angle, int radius) {
     GPoint end;
 
+    // Clear
+    graphics_context_set_fill_color(ctx, GColorClear);
+    graphics_fill_rect(ctx, GRect(0, 0, WIDTH, HEIGHT), 0, GCornerNone);
+
     // Draw big circle
     graphics_context_set_fill_color(ctx, GColorBlack);
     graphics_fill_circle(ctx, centre, radius);
@@ -84,55 +88,25 @@ static void snapshot(Layer *layer, GContext *ctx, GBitmap *target) {
     graphics_release_frame_buffer(ctx, display_bitmap);
 }
 
-static void get_second_bitmap(Layer *layer, GContext *ctx) {
+static void display_layer_update(Layer *layer, GContext *ctx) {
     time_t temp = time(NULL);
     struct tm *tick_time = localtime(&temp);
     double angle;
-
-    graphics_context_set_fill_color(ctx, GColorClear);
-    graphics_fill_rect(ctx, GRect(0, 0, WIDTH, HEIGHT), 0, GCornerNone);
 
     // Second
     angle = TRIG_MAX_ANGLE * (tick_time->tm_sec / 60.0);
     draw_ring(layer, ctx, angle, MAX_RADIUS);
-
     snapshot(layer, ctx, second_bitmap);
-}
-
-static void get_minute_bitmap(Layer *layer, GContext *ctx) {
-    time_t temp = time(NULL);
-    struct tm *tick_time = localtime(&temp);
-    double angle;
-
-    graphics_context_set_fill_color(ctx, GColorClear);
-    graphics_fill_rect(ctx, GRect(0, 0, WIDTH, HEIGHT), 0, GCornerNone);
 
     // Minute
     angle = TRIG_MAX_ANGLE * (tick_time->tm_min / 60.0);
     draw_ring(layer, ctx, angle, MAX_RADIUS - RING_WIDTH - GAP);
-
     snapshot(layer, ctx, minute_bitmap);
-}
-
-static void get_hour_bitmap(Layer *layer, GContext *ctx) {
-    time_t temp = time(NULL);
-    struct tm *tick_time = localtime(&temp);
-    double angle;
-
-    graphics_context_set_fill_color(ctx, GColorClear);
-    graphics_fill_rect(ctx, GRect(0, 0, WIDTH, HEIGHT), 0, GCornerNone);
 
     // Hour
     angle = TRIG_MAX_ANGLE * ((tick_time->tm_hour % 12) / 12.0);
     draw_ring(layer, ctx, angle, MAX_RADIUS - RING_WIDTH * 2 - GAP * 2);
-
     snapshot(layer, ctx, hour_bitmap);
-}
-
-static void display_layer_update(Layer *layer, GContext *ctx) {
-    get_second_bitmap(layer, ctx);
-    get_minute_bitmap(layer, ctx);
-    get_hour_bitmap(layer, ctx);
 
     // Clear
     graphics_context_set_fill_color(ctx, GColorClear);
