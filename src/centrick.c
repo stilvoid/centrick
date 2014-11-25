@@ -5,6 +5,7 @@
 static Window *window;
 static Layer *background_layer;
 static Layer *display_layer;
+static InverterLayer *inverter_layer;
 
 #define WIDTH 144
 #define HEIGHT 168
@@ -151,6 +152,10 @@ static void init(void) {
     layer_set_update_proc(display_layer, &display_layer_update);
     layer_add_child(background_layer, display_layer);
 
+    // Create the inverter layer
+    inverter_layer = inverter_layer_create(frame);
+    layer_add_child(display_layer, (Layer*)inverter_layer);
+
     // Set up the bitmaps
     second_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
     minute_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
@@ -162,6 +167,7 @@ static void deinit(void) {
     gbitmap_destroy(minute_bitmap);
     gbitmap_destroy(hour_bitmap);
 
+    inverter_layer_destroy(inverter_layer);
     layer_destroy(display_layer);
     layer_destroy(background_layer);
 
