@@ -5,6 +5,7 @@
 static Window *window;
 static Layer *background_layer;
 static Layer *display_layer;
+static InverterLayer *inverter_layer;
 
 #define WIDTH 144
 #define HEIGHT 168
@@ -18,6 +19,9 @@ static Layer *display_layer;
 #define RING_WIDTH 10
 #define GAP 5
 #define MAX_RADIUS (WIDTH / 2) - GAP
+
+#define KEY_INVERT 0
+#define KEY_ORDER 1
 
 # define M_PI		3.14159265358979323846	/* pi */
 
@@ -39,6 +43,8 @@ static GPathInfo path_info = {
 static GBitmap *second_bitmap;
 static GBitmap *minute_bitmap;
 static GBitmap *hour_bitmap;
+
+static bool seconds_outside = true;
 
 static void draw_ring(Layer *layer, GContext *ctx, double angle, int radius) {
     GPoint end;
@@ -95,7 +101,11 @@ static void display_layer_update(Layer *layer, GContext *ctx) {
 
     // Second
     angle = TRIG_MAX_ANGLE * (tick_time->tm_sec / 60.0);
-    draw_ring(layer, ctx, angle, MAX_RADIUS);
+    if(seconds_outside) {
+        draw_ring(layer, ctx, angle, MAX_RADIUS);
+    } else {
+        draw_ring(layer, ctx, angle, MAX_RADIUS - RING_WIDTH * 2 - GAP * 2);
+    }
     snapshot(layer, ctx, second_bitmap);
 
     // Minute
@@ -105,7 +115,11 @@ static void display_layer_update(Layer *layer, GContext *ctx) {
 
     // Hour
     angle = TRIG_MAX_ANGLE * ((tick_time->tm_hour % 12) / 12.0);
-    draw_ring(layer, ctx, angle, MAX_RADIUS - RING_WIDTH * 2 - GAP * 2);
+    if(seconds_outside) {
+        draw_ring(layer, ctx, angle, MAX_RADIUS - RING_WIDTH * 2 - GAP * 2);
+    } else {
+        draw_ring(layer, ctx, angle, MAX_RADIUS);
+    }
     snapshot(layer, ctx, hour_bitmap);
 
     // Clear
@@ -123,6 +137,26 @@ static void display_layer_update(Layer *layer, GContext *ctx) {
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changes) {
     layer_mark_dirty(display_layer);
+}
+
+static void app_message_received(DictionaryIterator *iter, void *context) {
+    Tuple *tuple = dict_read_first(iter);
+    while(tuple) {
+        if(tuple->key == KEY_INVERT) {
+            if(tuple->value->uint8 == 0) {
+                layer_set_hidden((Layer*)inverter_layer, true);
+            } else {
+                layer_set_hidden((Layer*)inverter_layer, false);
+            }
+        } else if(tuple->key == KEY_ORDER) {
+            if(tuple->value->uint8 == 0) {
+                seconds_outside = true;
+            } else {
+                seconds_outside = false;
+            }
+        }
+        tuple = dict_read_next(iter);
+    }
 }
 
 static void init(void) {
@@ -151,10 +185,27 @@ static void init(void) {
     layer_set_update_proc(display_layer, &display_layer_update);
     layer_add_child(background_layer, display_layer);
 
+    // Create the inverter layer
+    inverter_layer = inverter_layer_create(frame);
+    layer_add_child(display_layer, (Layer*)inverter_layer);
+    
+    // Hide it by default
+    layer_set_hidden((Layer*)inverter_layer, true);
+
     // Set up the bitmaps
     second_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
     minute_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
     hour_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
+
+    // Message receive
+    app_message_register_inbox_received(app_message_received);
+    
+    // Message dropped
+    app_message_register_inbox_dropped(NULL);
+    
+    // Open inbox
+    // TODO: Work out the right size
+    app_message_open(APP_MESSAGE_INBOX_SIZE_MINIMUM, APP_MESSAGE_OUTBOX_SIZE_MINIMUM);
 }
 
 static void deinit(void) {
@@ -162,6 +213,7 @@ static void deinit(void) {
     gbitmap_destroy(minute_bitmap);
     gbitmap_destroy(hour_bitmap);
 
+    inverter_layer_destroy(inverter_layer);
     layer_destroy(display_layer);
     layer_destroy(background_layer);
 
