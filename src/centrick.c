@@ -45,6 +45,7 @@ static GBitmap *minute_bitmap;
 static GBitmap *hour_bitmap;
 
 static bool seconds_outside = true;
+static bool invert = false;
 
 static void draw_ring(Layer *layer, GContext *ctx, double angle, int radius) {
     GPoint end;
@@ -144,16 +145,22 @@ static void app_message_received(DictionaryIterator *iter, void *context) {
     while(tuple) {
         if(tuple->key == KEY_INVERT) {
             if(tuple->value->uint8 == 0) {
-                layer_set_hidden((Layer*)inverter_layer, true);
+                invert = false;
             } else {
-                layer_set_hidden((Layer*)inverter_layer, false);
+                invert = true;
             }
+
+            persist_write_bool(KEY_INVERT, invert);
+
+            layer_set_hidden((Layer*)inverter_layer, !invert);
         } else if(tuple->key == KEY_ORDER) {
             if(tuple->value->uint8 == 0) {
                 seconds_outside = true;
             } else {
                 seconds_outside = false;
             }
+
+            persist_write_bool(KEY_ORDER, seconds_outside);
         }
         tuple = dict_read_next(iter);
     }
@@ -189,9 +196,6 @@ static void init(void) {
     inverter_layer = inverter_layer_create(frame);
     layer_add_child(display_layer, (Layer*)inverter_layer);
     
-    // Hide it by default
-    layer_set_hidden((Layer*)inverter_layer, true);
-
     // Set up the bitmaps
     second_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
     minute_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
@@ -206,6 +210,21 @@ static void init(void) {
     // Open inbox
     // TODO: Work out the right size
     app_message_open(APP_MESSAGE_INBOX_SIZE_MINIMUM, APP_MESSAGE_OUTBOX_SIZE_MINIMUM);
+
+    if(!persist_exists(KEY_INVERT)) {
+        persist_write_bool(KEY_INVERT, false);
+    }
+
+    if(!persist_exists(KEY_ORDER)) {
+        persist_write_bool(KEY_ORDER, true);
+    }
+
+    invert = persist_read_bool(KEY_INVERT);
+    seconds_outside = persist_read_bool(KEY_ORDER);
+
+    // Hide the inverter?
+    layer_set_hidden((Layer*)inverter_layer, !invert);
+
 }
 
 static void deinit(void) {
