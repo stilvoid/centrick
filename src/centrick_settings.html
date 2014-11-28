@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Centrick Settings</title>
+    </head>
+
+    <body>
+        <h1>Centrick</h1>
+
+        <p>
+            Colour scheme:
+            <select id="invert">
+                <option value="no">Black on white</option>
+                <option value="yes">White on black</option>
+            </select>
+        </p>
+
+        <p>
+            Ring ordering:
+            <select id="order">
+                <option value="out">Seconds outside</option>
+                <option value="in">Hours outside</option>
+            </select>
+        </p>
+
+        <p>
+            <input type="button" id="save" value="Save" />
+    </body>
+
+    <script>
+        document.getElementById("save").onclick = function() {
+            var data = {
+                "invert": document.getElementById("invert").value,
+                "order": document.getElementById("order").value
+            };
+
+            location.href = "pebblejs://close#" + encodeURIComponent(JSON.stringify(data));
+        };
+    </script>
+</html>
