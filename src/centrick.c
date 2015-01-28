@@ -46,6 +46,7 @@ static GBitmap *hour_bitmap;
 
 static bool seconds_outside = true;
 static bool invert = false;
+static bool connected = false;
 
 static void draw_ring(Layer *layer, GContext *ctx, double angle, int radius) {
     GPoint end;
@@ -134,6 +135,12 @@ static void display_layer_update(Layer *layer, GContext *ctx) {
     graphics_draw_bitmap_in_rect(ctx, second_bitmap, GRect(0, 0, WIDTH, HEIGHT));
     graphics_draw_bitmap_in_rect(ctx, minute_bitmap, GRect(0, 0, WIDTH, HEIGHT));
     graphics_draw_bitmap_in_rect(ctx, hour_bitmap, GRect(0, 0, WIDTH, HEIGHT));
+
+    // Draw another circle if we've lost bluetooth
+    if(!connected) {
+        graphics_context_set_fill_color(ctx, GColorBlack);
+        graphics_fill_circle(ctx, centre, RING_WIDTH);
+    }
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changes) {
@@ -166,6 +173,10 @@ static void app_message_received(DictionaryIterator *iter, void *context) {
     }
 }
 
+static void connection_handler(bool is_connected) {
+    connected = is_connected;
+}
+
 static void init(void) {
     window = window_create();
 
@@ -177,6 +188,10 @@ static void init(void) {
 
     // Register tick timer service
     tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
+
+    // Register bluetooth connection service
+    connected = bluetooth_connection_service_peek();
+    bluetooth_connection_service_subscribe(connection_handler);
 
     // Get the root layer
     Layer *root_layer = window_get_root_layer(window);
@@ -224,7 +239,6 @@ static void init(void) {
 
     // Hide the inverter?
     layer_set_hidden((Layer*)inverter_layer, !invert);
-
 }
 
 static void deinit(void) {
