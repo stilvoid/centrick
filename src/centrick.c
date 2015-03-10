@@ -239,6 +239,8 @@ static void init(void) {
 
     // Hide the inverter?
     layer_set_hidden((Layer*)inverter_layer, !invert);
+
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Heap used: %d", heap_bytes_used());
 }
 
 static void deinit(void) {
