@@ -4,7 +4,7 @@
     "longName": "A pebble watchface that shows the time using concentric arcs",
     "companyName": "Stilvoid",
     "versionCode": 1,
-    "versionLabel": "0.3",
+    "versionLabel": "0.4",
     "watchapp": {
         "watchface": true
     },
