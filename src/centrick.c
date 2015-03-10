@@ -3,12 +3,12 @@
 #define PI 3.141592653589793238462643383
 
 static Window *window;
-static Layer *background_layer;
 static Layer *display_layer;
 static InverterLayer *inverter_layer;
 
 #define WIDTH 144
 #define HEIGHT 168
+#define OFFSET 12
 #define CENTRE { WIDTH / 2, HEIGHT / 2 }
 #define TOP_CENTRE { WIDTH / 2, 0 }
 #define TOP_LEFT {0, 0}
@@ -40,9 +40,7 @@ static GPathInfo path_info = {
     }
 };
 
-static GBitmap *second_bitmap;
-static GBitmap *minute_bitmap;
-static GBitmap *hour_bitmap;
+static GBitmap *buffer;
 
 static bool seconds_outside = true;
 static bool invert = false;
@@ -51,8 +49,10 @@ static bool connected = false;
 static void draw_ring(Layer *layer, GContext *ctx, double angle, int radius) {
     GPoint end;
 
+    graphics_context_set_compositing_mode(ctx, GCompOpAssign);
+
     // Clear
-    graphics_context_set_fill_color(ctx, GColorClear);
+    graphics_context_set_fill_color(ctx, GColorWhite);
     graphics_fill_rect(ctx, GRect(0, 0, WIDTH, HEIGHT), 0, GCornerNone);
 
     // Draw big circle
@@ -90,9 +90,9 @@ static void draw_ring(Layer *layer, GContext *ctx, double angle, int radius) {
     graphics_fill_circle(ctx, centre, radius - RING_WIDTH);
 }
 
-static void snapshot(Layer *layer, GContext *ctx, GBitmap *target) {
+static void snapshot(GContext *ctx) {
     GBitmap *display_bitmap = graphics_capture_frame_buffer(ctx);
-    memcpy(target->addr, display_bitmap->addr, display_bitmap->row_size_bytes * display_bitmap->bounds.size.h);
+    memcpy(buffer->addr, display_bitmap->addr + (display_bitmap->row_size_bytes * OFFSET), display_bitmap->row_size_bytes * WIDTH);
     graphics_release_frame_buffer(ctx, display_bitmap);
 }
 
@@ -108,12 +108,17 @@ static void display_layer_update(Layer *layer, GContext *ctx) {
     } else {
         draw_ring(layer, ctx, angle, MAX_RADIUS - RING_WIDTH * 2 - GAP * 2);
     }
-    snapshot(layer, ctx, second_bitmap);
+    snapshot(ctx);
 
     // Minute
     angle = TRIG_MAX_ANGLE * (tick_time->tm_min / 60.0);
     draw_ring(layer, ctx, angle, MAX_RADIUS - RING_WIDTH - GAP);
-    snapshot(layer, ctx, minute_bitmap);
+
+    // Overlay the seconds
+    graphics_context_set_compositing_mode(ctx, GCompOpAnd);
+    graphics_draw_bitmap_in_rect(ctx, buffer, GRect(0, OFFSET, WIDTH, WIDTH));
+
+    snapshot(ctx);
 
     // Hour
     angle = TRIG_MAX_ANGLE * ((tick_time->tm_hour % 12) / 12.0);
@@ -122,19 +127,10 @@ static void display_layer_update(Layer *layer, GContext *ctx) {
     } else {
         draw_ring(layer, ctx, angle, MAX_RADIUS);
     }
-    snapshot(layer, ctx, hour_bitmap);
 
-    // Clear
-    graphics_context_set_fill_color(ctx, GColorClear);
-    graphics_fill_rect(ctx, GRect(0, 0, WIDTH, HEIGHT), 0, GCornerNone);
-
-    // Set compositing mode
+    // Overlay the seconds and minutes
     graphics_context_set_compositing_mode(ctx, GCompOpAnd);
-
-    // Draw the bitmaps
-    graphics_draw_bitmap_in_rect(ctx, second_bitmap, GRect(0, 0, WIDTH, HEIGHT));
-    graphics_draw_bitmap_in_rect(ctx, minute_bitmap, GRect(0, 0, WIDTH, HEIGHT));
-    graphics_draw_bitmap_in_rect(ctx, hour_bitmap, GRect(0, 0, WIDTH, HEIGHT));
+    graphics_draw_bitmap_in_rect(ctx, buffer, GRect(0, OFFSET, WIDTH, WIDTH));
 
     // Draw another circle if we've lost bluetooth
     if(!connected) {
@@ -183,8 +179,8 @@ static void init(void) {
     const bool animated = true;
     window_stack_push(window, animated);
 
-    // Set a black background
-    window_set_background_color(window, GColorClear);
+    // Set a white background
+    window_set_background_color(window, GColorWhite);
 
     // Register tick timer service
     tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
@@ -194,27 +190,16 @@ static void init(void) {
     bluetooth_connection_service_subscribe(connection_handler);
 
     // Get the root layer
-    Layer *root_layer = window_get_root_layer(window);
-    GRect frame = layer_get_frame(root_layer);
-    
-    // Create a layer for the marks
-    background_layer = layer_create(frame);
-    //layer_set_update_proc(background_layer, &background_layer_update);
-    layer_add_child(root_layer, background_layer);
-
-    // Create a layer for the display
-    display_layer = layer_create(frame);
+    display_layer = window_get_root_layer(window);
+    GRect frame = layer_get_frame(display_layer);
     layer_set_update_proc(display_layer, &display_layer_update);
-    layer_add_child(background_layer, display_layer);
-
+    
     // Create the inverter layer
     inverter_layer = inverter_layer_create(frame);
     layer_add_child(display_layer, (Layer*)inverter_layer);
     
     // Set up the bitmaps
-    second_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
-    minute_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
-    hour_bitmap = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
+    buffer = gbitmap_create_blank(GSize(WIDTH, HEIGHT));
 
     // Message receive
     app_message_register_inbox_received(app_message_received);
@@ -244,13 +229,9 @@ static void init(void) {
 }
 
 static void deinit(void) {
-    gbitmap_destroy(second_bitmap);
-    gbitmap_destroy(minute_bitmap);
-    gbitmap_destroy(hour_bitmap);
+    gbitmap_destroy(buffer);
 
     inverter_layer_destroy(inverter_layer);
-    layer_destroy(display_layer);
-    layer_destroy(background_layer);
 
     window_destroy(window);
 }
